@@ -1,12 +1,24 @@
-FROM nginx:alpine
+# ── Stage 1: builder ────────────────────────────────────────────────────────
+FROM node:18-alpine AS builder
 
-# Limpia contenido por defecto
+WORKDIR /app
+
+# Copiar archivos estáticos
+COPY index.html app.js ./
+
+# ── Stage 2: production ──────────────────────────────────────────────────────
+FROM nginx:alpine AS production
+
+# Limpiar contenido por defecto
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copia los archivos del frontend
-COPY index.html app.js /usr/share/nginx/html/
+# Copiar archivos estáticos desde el builder
+COPY --from=builder /app/index.html /app/app.js /usr/share/nginx/html/
 
-# Copia la configuración custom de Nginx
+# Copiar configuración personalizada de Nginx
 COPY default.conf /etc/nginx/conf.d/default.conf
 
+# nginx:alpine ya ejecuta workers como usuario 'nginx' (no root)
 EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

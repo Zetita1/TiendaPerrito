@@ -1,13 +1,32 @@
-FROM node:18-alpine
+# ── Stage 1: builder ────────────────────────────────────────────────────────
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
 COPY package*.json ./
+RUN npm ci
 
-RUN npm install --production
+COPY server.js ./
 
-COPY . .
+# ── Stage 2: production ──────────────────────────────────────────────────────
+FROM node:18-alpine AS production
+
+WORKDIR /app
+
+# Usuario no privilegiado
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Solo dependencias de producción
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copiar código desde el builder
+COPY --from=builder /app/server.js ./
+
+# Cambiar propietario y usuario
+RUN chown -R appuser:appgroup /app
+USER appuser
 
 EXPOSE 3001
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
